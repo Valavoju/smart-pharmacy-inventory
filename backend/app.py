@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import os   # ✅ ADDED (for Render port)
 
 # ---------- CREATE APP ----------
 app = Flask(__name__)
@@ -27,7 +28,6 @@ def dashboard():
     low_stock = len(reorder)
     expiring_soon = len(expiry)
 
-    # Simple revenue estimate
     revenue = sum(
         item.get("Current_Stock", 0) * 10 for item in inventory
     )
@@ -62,7 +62,7 @@ def reorder():
 # ================= CHATBOT =================
 @app.route("/chatbot", methods=["POST"])
 def chatbot():
-    data = request.get_json()
+    data = request.get_json() or {}   # ✅ SAFETY FIX
     question = data.get("question", "").strip()
 
     if not question:
@@ -70,11 +70,9 @@ def chatbot():
 
     result = chatbot_response(question)
 
-    # TEXT RESPONSE
     if result["type"] == "text":
         return jsonify({"answer": result["response"]})
 
-    # TABLE RESPONSE → convert to readable text
     if result["type"] == "table":
         rows = result["response"]
 
@@ -124,21 +122,20 @@ def chatbot():
         "answer": "I can help with inventory, expiry, reorder, and loss-related queries."
     })
 
+# ================= ORDER =================
 @app.route("/order", methods=["POST"])
 def place_order():
-    data = request.get_json()
+    data = request.get_json() or {}   # ✅ SAFETY FIX
     drug = data.get("medicine")
 
     if not drug:
         return jsonify({"error": "Medicine name required"}), 400
 
-    # get inventory
     inventory = get_inventory()
 
     for item in inventory:
         if item["Drug_Name"].lower() == drug.lower():
-            # simulate reorder
-            item["Current_Stock"] += 100  # assume supplier delivers 100 units
+            item["Current_Stock"] += 100
             break
 
     return jsonify({
@@ -149,4 +146,5 @@ def place_order():
 
 # ---------- RUN ----------
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))   # ✅ Render dynamic port
+    app.run(host="0.0.0.0", port=port)         # ✅ REQUIRED
